@@ -866,8 +866,6 @@ void dsgen()
 }
 
 void init(){
-	//codes for initialization
-
 	srand(time(NULL));
 
 	dsgen();
