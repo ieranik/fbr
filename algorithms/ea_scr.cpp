@@ -10,6 +10,10 @@
 #include <conio.h>
 #include <unordered_set>
 #include <queue>
+#include <sys/time.h>
+#include <time.h>
+
+
 
 #include <windows.h>
 #include <glut.h>
@@ -18,35 +22,14 @@ using namespace std;
 
 #define pi (2*acos(0.0))
 #define eps 0.0000001
-
-#define N 160
-#define cpx 4
-#define numobs 60
-#define rrange (N * cpx)
-#define crange 60
-#define osa 8
-#define osd 4
-#define numtarget 16
-#define maxcol 128
-#define lmax 100
 #define inf 10000.0
-
+#define numtestcases 1
 
 double cr;
 int numpoints;
-int mode;
-
 
 FILE* fin;
 FILE* fout;
-
-
-
-int LT[N][N];
-bool B[N][N];
-int TIME;
-
-vector< vector<int> > AL;
 
 
 double max2(double a,double b)
@@ -59,7 +42,6 @@ double min2(double a,double b)
     return (a<b)?a:b;
 }
 
-
 class point
 {
 public:
@@ -70,255 +52,6 @@ public:
         y=yy;
     }
 };
-
-class cell
-{
-public:
-    int x, y;
-    point c;
-    cell(int xx = 0.0, int yy = 0.0)
-    {
-        x = xx;
-        y = yy;
-        c.x = (x + 0.5) * cpx;
-        c.y = (y + 0.5) * cpx;
-    }
-};
-
-cell getcell(point p)
-{
-    int x = (int)floor(p.x / cpx);
-    int y = (int)floor(p.y / cpx);
-    return cell(x, y);
-}
-
-
-class obs
-{
-public:
-    double xl,xh,yl,yh;
-    obs(double xxl=0.0, double xxh=0.0, double yyl=0.0, double yyh=0.0)
-    {
-        xl=xxl;
-        xh=xxh;
-        yl=yyl;
-        yh=yyh;
-    }
-};
-
-
-class robot
-{
-public:
-    int ind;
-    int cnt;
-    robot(int i = -1, int c = 0)
-    {
-        ind = i;
-        cnt = c;
-    }
-};
-
-bool comparator(const robot& lhs, const robot& rhs)
-{
-   return lhs.cnt < rhs.cnt;
-}
-
-bool rcomparator(const robot& lhs, const robot& rhs)
-{
-   return lhs.cnt > rhs.cnt;
-}
-
-
-bool isvalid(point p)
-{
-    if (p.x < 0 || p.y < 0 || p.x >= N * cpx || p.y >= N * cpx) return false;
-    return true;
-}
-
-vector<obs> obsdata;
-vector<point> targetdata;
-vector<point> dest;
-vector<int> targetdir = vector<int>(numtarget, 0);
-
-
-void po(obs o)
-{
-    cout<<o.xl<<" "<<o.xh<<" "<<o.yl<<" "<<o.yh<<endl;
-}
-
-void pp(point p)
-{
-    cout << p.x << " " << p.y << endl;
-}
-
-void pts()
-{
-    for (int i = 0; i < targetdata.size(); i++) pp(targetdata[i]);
-    cout << endl;
-}
-
-bool doesint1(obs a,obs b)
-{
-    if(((b.xl+eps<a.xl&&a.xl+eps<b.xh)||(b.xl+eps<a.xh&&a.xh+eps<b.xh)||(a.xl+eps<b.xl&&b.xl+eps<a.xh)||(a.xl+eps<b.xh&&b.xh+eps<a.xh))&&((b.yl+eps<a.yl&&a.yl+eps<b.yh)||(b.yl+eps<a.yh&&a.yh+eps<b.yh)||(a.yl+eps<b.yl&&b.yl+eps<a.yh)||(a.yl+eps<b.yh&&b.yh+eps<a.yh)))return true;
-
-    return false;
-}
-
-bool doesintn(vector<obs> ol,obs o)
-{
-    int i;
-    for(i=0;i<ol.size();i++)if(doesint1(ol[i],o)==true)return true;
-
-    return false;
-}
-
-bool isinside1(obs o, point p)
-{
-    if(o.xl<p.x+eps&&p.x<o.xh+eps&&o.yl<p.y+eps&&p.y<o.yh+eps)return true;
-
-    return false;
-}
-
-bool isinsiden(vector<obs> ol, point p)
-{
-    int i;
-    for(i=0;i<ol.size();i++)if(isinside1(ol[i],p)==true)return true;
-
-    return false;
-}
-
-
-void genobs()
-{
-    obsdata.clear();
-
-    obs o;
-    int i,ri,rii;
-    double rd;
-    srand(time(NULL));
-    int cnt=numobs;
-    while(cnt!=0)
-    {
-        o.xl=rand()%(N-osa-osd);
-        ri=rand()%(2*osd)+(osa-osd);
-        o.xh=o.xl+ri;
-
-        o.yl=rand()%(N-osa-osd);
-        ri=rand()%(2*osd)+(osa-osd);
-        o.yh=o.yl+ri;
-
-        o.xl *= cpx;
-        o.xh *= cpx;
-        o.yl *= cpx;
-        o.yh *= cpx;
-
-
-        if(doesintn(obsdata,o)==false)
-        {
-            obsdata.push_back(o);
-            cnt--;
-        }
-    }
-}
-
-
-void genblockedcells()
-{
-    int i, j, k;
-
-	for (i = 0; i < N; i++)
-    {
-        for (j = 0; j < N; j++)
-        {
-            point tp;
-            tp.x = i * cpx + (cpx / 2.0);
-            tp.y = j * cpx + (cpx / 2.0);
-
-            bool flag = true;
-            for (k = 0; k < numobs; k++)
-            {
-                if (isinside1(obsdata[k], tp) == true)
-                {
-                    flag = false;
-                    break;
-                }
-            }
-            B[i][j] = flag;
-        }
-    }
-}
-
-
-void gentarget()
-{
-    targetdata.clear();
-
-    int cnt = numtarget;
-    while(cnt != 0)
-    {
-        point tp;
-        int ri, rii;
-
-        ri=rand()%((int)(cpx * N));
-        rii=rand()%1000;
-        tp.x=ri+(double)rii/1000.0;
-
-
-        ri=rand()%((int)(cpx * N));
-        rii=rand()%1000;
-        tp.y=ri+(double)rii/1000.0;
-
-
-
-        targetdata.push_back(tp);
-        cnt--;
-
-
-    }
-}
-
-
-
-double area3p(point a, point b, point c)
-{
-    return a.x*(b.y-c.y)+b.x*(c.y-a.y)+c.x*(a.y-b.y);
-}
-
-bool doesint(point a, point b, point c, point d)
-{
-    if(area3p(a,b,c)*area3p(a,b,d)<=0&&area3p(c,d,a)*area3p(c,d,b)<=0)
-        return true;
-    return false;
-}
-
-vector<obs> rangequery(point p)
-{
-    int j;
-    vector<obs> ret;
-    obs to;
-    to.xl=p.x-crange;
-    to.xh=p.x+crange;
-    to.yl=p.y-crange;
-    to.yh=p.y+crange;
-    for(j=0;j<obsdata.size();j++)
-    {
-        if(doesint1(obsdata[j],to)==true)ret.push_back(obsdata[j]);
-    }
-    return ret;
-}
-
-
-
-
-
-
-
-
-
-
-//ekhane shuru
-
 
 class bcnode
 {
@@ -360,8 +93,6 @@ vector<point> locs;
 vector<point> allpoints;
 vector<bool> isap;
 int numcv;
-bool is2con;
-bool iscon;
 
 vector<bcnode> bcl;
 vector<int> blocknum;
@@ -412,12 +143,10 @@ void generate_graph()
         tmp.clear();
         for (j = 0; j < locs.size(); j++)
         {
-            if (j != i && sqr_dist(locs[i], locs[j]) <= cr * cr + eps) tmp.push_back(j);
+            if (j != i && sqr_dist(locs[i], locs[j]) <= cr * cr) tmp.push_back(j);
         }
         G.push_back(tmp);
     }
-
-    //cout << G.size() << " g\n";
 }
 
 
@@ -437,8 +166,9 @@ void get_ap(int u, bool visited[], int disc[],  int low[], int parent[], bool ap
     // Initialize discovery time and low value
     disc[u] = low[u] = ++time;
 
-    // Go through all vertices aadjacent to this
+    //bridgelist.clear();
 
+    // Go through all vertices aadjacent to this
     for (int i = 0; i < G[u].size(); i++)
     {
         int v = G[u][i];  // v is current adjacent of u
@@ -503,39 +233,7 @@ void art_points()
 
 
     isap = vector<bool>(G.size(), false);
-    is2con = true;
-    for (int i = 0; i < G.size(); i++)
-    {
-        isap[i] = ap[i];
-        if (ap[i] == true) is2con = false;
-    }
-}
-
-int dfsvis(int u, bool visited[])
-{
-    visited[u] = true;
-    int cnt = 1;
-
-    for (int i = 0; i < G[u].size(); i++)
-    {
-        int v = G[u][i];
-        if (!visited[v]) cnt += dfsvis(v, visited);
-    }
-    return cnt;
-}
-
-
-
-void dfs()
-{
-    bool *visited = new bool[G.size()];
-
-    for (int i = 0; i < G.size(); i++) visited[i] = false;
-
-    int cnt = dfsvis(0, visited);
-
-    if (cnt < (int)G.size()) iscon = false;
-    else iscon = true;
+    for (int i = 0; i < G.size(); i++) isap[i] = ap[i];
 }
 
 
@@ -606,7 +304,6 @@ void create_bcl()
         }
     }
 
-    //cout << bcl.size() << "i1bcl\n";
 
     bnums();
 
@@ -625,11 +322,8 @@ void create_bcl()
         }
     }
 
-    // << bcl.size() << "i1bcl\n";
 
     for (int i = 0; i < bcl.size(); i++) bcl[i].nodelist = removedup(bcl[i].nodelist);
-
-    //cout << bcl.size() << " bcl\n";
 
 //    cout << "here" << endl;
 //    for (int i = 0; i < bcl.size(); i++) printbcn(bcl[i]);
@@ -681,8 +375,16 @@ void create_tree()
             }
         }
     }
-   // cout << T.size() << " t\n";
 
+//    for (int i = 0; i < T.size(); i++)
+//    {
+//        cout << i << ": ";
+//        for (int j = 0; j < T[i].size(); j++)
+//        {
+//            cout << T[i][j] << " ";
+//        }
+//        cout << endl;
+//    }
 }
 
 
@@ -724,8 +426,19 @@ void create_dtree()
         }
     }
 
-    //cout << DT.size() << " dt\n";
-
+//    cout << "hereee" << endl;
+//
+//    for (int i = 0; i < DT.size(); i++)
+//    {
+//        cout << i << ": ";
+//        for (int j = 0; j < DT[i].size(); j++)
+//        {
+//            cout << DT[i][j].first << " ";
+//        }
+//        cout << endl;
+//    }
+//
+//    for (int i = 0; i < bcl.size(); i++) cout << i << " " << bcl[i].depth << endl;
 
 }
 
@@ -757,6 +470,17 @@ void super_impose()
             }
         }
     }
+
+
+//    for (int i = 0; i < T.size(); i++)
+//    {
+//        for (int j = 0; j < T.size(); j++)
+//        {
+//            cout << am[i][j].weight << "\t";
+//        }
+//        cout << endl;
+//    }
+//    cout << endl;
 
 
 }
@@ -814,9 +538,13 @@ int lca(int u, int v)
 }
 
 
+
+
 void create_aug_tree()
 {
     int n = bcl.size();
+
+    cout << "n: " << n << endl;
 
     for (int i = 0; i < n; i++)
     {
@@ -851,7 +579,6 @@ void create_aug_tree()
 
             int t = lca(i, j);
 
-
             if (amd[t][i].weight > am[i][j].weight)
             {
                 amd[t][i].src = j;
@@ -881,6 +608,44 @@ void create_aug_tree()
             }
         }
     }
+//    cout << "amd" << endl;
+//    for (int i = 0; i < T.size(); i++)
+//    {
+//        for (int j = 0; j < T.size(); j++)
+//        {
+//            cout << amd[i][j].weight << "\t";
+//        }
+//        cout << endl;
+//    }
+//
+//    cout << endl;
+//
+//    for (int i = 0; i < T.size(); i++)
+//    {
+//        for (int j = 0; j < T.size(); j++)
+//        {
+//            cout << amd[i][j].src << "\t";
+//        }
+//        cout << endl;
+//    }
+//
+//    cout << endl;
+//
+//
+//    for (int i = 0; i < T.size(); i++)
+//    {
+//        for (int j = 0; j < T.size(); j++)
+//        {
+//            cout << amd[i][j].dst << "\t";
+//        }
+//        cout << endl;
+//    }
+//
+//    cout << "amd over" << endl;
+
+
+
+
 
 
     for (int i = 0; i < T.size(); i++)
@@ -906,8 +671,40 @@ void create_aug_tree()
         }
     }
 
-
-
+//    cout << endl;
+//
+//    for (int i = 0; i < T.size(); i++)
+//    {
+//        for (int j = 0; j < T.size(); j++)
+//        {
+//            cout << amd[i][j].weight << "\t";
+//        }
+//        cout << endl;
+//    }
+//
+//    cout << endl;
+//
+//    for (int i = 0; i < T.size(); i++)
+//    {
+//        for (int j = 0; j < T.size(); j++)
+//        {
+//            cout << amd[i][j].src << "\t";
+//        }
+//        cout << endl;
+//    }
+//
+//    cout << endl;
+//
+//    for (int i = 0; i < T.size(); i++)
+//    {
+//        for (int j = 0; j < T.size(); j++)
+//        {
+//            cout << amd[i][j].dst << "\t";
+//        }
+//        cout << endl;
+//    }
+//
+//    cout << "amd2 over" << endl;
 
     for (int i = 0; i < DT.size(); i++)
     {
@@ -920,8 +717,48 @@ void create_aug_tree()
 
     }
 
+//    for (int i = 0; i < DT.size(); i++)
+//    {
+//        amd[i][11].weight = inf;
+//        amd[11][i].weight = inf;
+//
+//    }
+
+//    cout << endl;
+//
+//    for (int i = 0; i < T.size(); i++)
+//    {
+//        for (int j = 0; j < T.size(); j++)
+//        {
+//            cout << amd[i][j].weight << "\t";
+//        }
+//        cout << endl;
+//    }
+//
+//    cout << endl;
+//
+//    for (int i = 0; i < T.size(); i++)
+//    {
+//        for (int j = 0; j < T.size(); j++)
+//        {
+//            cout << amd[i][j].src << "\t";
+//        }
+//        cout << endl;
+//    }
+//
+//    cout << endl;
+//
+//    for (int i = 0; i < T.size(); i++)
+//    {
+//        for (int j = 0; j < T.size(); j++)
+//        {
+//            cout << amd[i][j].dst << "\t";
+//        }
+//        cout << endl;
+//    }
 
 }
+
 
 
 
@@ -940,7 +777,6 @@ int findmin(vector<int> v, double cost[])
     return ret;
 }
 
-
 vector<int> delete_elem(vector<int> v, int e)
 {
     vector<int> ret;
@@ -953,7 +789,6 @@ vector<int> delete_elem(vector<int> v, int e)
     }
     return ret;
 }
-
 
 bool is_elem(vector<int> F, int e)
 {
@@ -1205,12 +1040,31 @@ double adjust_pos()
 }
 
 
-//ekhane shesh
 
 
 
 
 
+
+
+void input_data()
+{
+    fin = fopen("errortest2.txt","r");
+	fscanf(fin, " %d", &numpoints);
+	fscanf(fin, " %lf", &cr);
+
+	allpoints.clear();
+	for (int i = 0; i < numpoints * numtestcases; i++)
+    {
+        point tmp;
+        fscanf(fin, " %lf %lf", &tmp.x, &tmp.y);
+        allpoints.push_back(tmp);
+    }
+
+    //cout << " ok" << locs[1].x << endl;
+    fclose(fin);
+
+}
 
 
 
@@ -1224,31 +1078,6 @@ void drawSquare(double x, double y, double s)
 		glVertex3f( x - s, y + s, 0);
 	}glEnd();
 }
-
-void drawCircle(double x, double y, double radius)
-{
-    int i;
-    int segments = 16;
-    struct point points[17];
-    //generate points
-    for(i=0;i<=segments;i++)
-    {
-        points[i].x = x + radius*cos(((double)i/(double)segments)*2*pi);
-        points[i].y = y + radius*sin(((double)i/(double)segments)*2*pi);
-    }
-    //draw segments using generated points
-    for(i=0;i<segments;i++)
-    {
-        glBegin(GL_TRIANGLES);
-        {
-            glVertex3f(x, y, 0);
-			glVertex3f(points[i].x,points[i].y,0);
-			glVertex3f(points[i+1].x,points[i+1].y,0);
-        }
-        glEnd();
-    }
-}
-
 
 
 void keyboardListener(unsigned char key, int x,int y){
@@ -1362,518 +1191,103 @@ void display(){
     int i,j;
 
 
-    glColor3f(1,0,0);
-
-    for(i=0;i<obsdata.size();i++)
+    for (i = 0; i < locs.size(); i++)
     {
-        glBegin(GL_QUADS);
+        if (isap[i] == false) glColor3f(1, 0, 0);
+        else glColor3f(0, 0, 1);
+        drawSquare(locs[i].x, locs[i].y, 3);
+    }
+
+
+    glColor3f(0, 1, 0);
+    for (i = 0; i < locs.size(); i++)
+    {
+        for (j = 0; j < G[i].size(); j++)
         {
-			glVertex3f(obsdata[i].xl,obsdata[i].yl,0);
-			glVertex3f(obsdata[i].xh,obsdata[i].yl,0);
-			glVertex3f(obsdata[i].xh,obsdata[i].yh,0);
-			glVertex3f(obsdata[i].xl,obsdata[i].yh,0);
+            glBegin(GL_LINES);
+            {
+                glVertex3f(locs[i].x, locs[i].y, 0);
+                glVertex3f(locs[G[i][j]].x, locs[G[i][j]].y, 0);
+            }
+            glEnd();
+
+        }
+
+    }
+
+    glColor3f(0, 1, 1);
+    for (i = 0; i < add_edges.size(); i++)
+    {
+        glBegin(GL_LINES);
+        {
+            glVertex3f(locs[add_edges[i].first].x, locs[add_edges[i].first].y, 0);
+            glVertex3f(locs[add_edges[i].second].x, locs[add_edges[i].second].y, 0);
         }
         glEnd();
     }
 
-    for (i = 0; i < G.size(); i++)
-    {
-        for (j = 0; j < G[i].size(); j++)
-        {
-            glColor3f(1, 0, 1);
-            glBegin(GL_LINES);
-            {
-                glVertex3f(targetdata[i].x, targetdata[i].y, 1.0);
-                glVertex3f(targetdata[G[i][j]].x, targetdata[G[i][j]].y, 1.0);
-
-            }
-            glEnd();
-
-        }
-    }
-
-
-    if (mode == 1) glColor3f(0,0,1);
-    else glColor3f(1,1,0);
-    for (i = 0; i < targetdata.size(); i++) drawCircle(targetdata[i].x, targetdata[i].y, 4.0);
-
-
-
-    for (i = 0; i < N; i++)
-    {
-        for (j = 0; j < N; j++)
-        {
-            glColor3f(0, LT[i][j] / (double)lmax, 0);
-            glBegin(GL_QUADS);
-            {
-                glVertex3f(i * cpx, j * cpx, 0);
-                glVertex3f((i + 1) * cpx, j * cpx, 0);
-                glVertex3f((i + 1) * cpx, (j + 1) * cpx, 0);
-                glVertex3f(i * cpx, (j + 1) * cpx, 0);
-            }
-            glEnd();
-        }
-    }
 
 	//ADD this line in the end --- if you use double buffer (i.e. GL_DOUBLE)
 	glutSwapBuffers();
 }
 
-
-bool advancedest(int i)
-{
-    if (sqr_dist(targetdata[i], dest[i]) < cpx * cpx)
-    {
-        targetdata[i] = dest[i];
-        return true;
-    }
-    else
-    {
-        double distance = sqrt(sqr_dist(targetdata[i], dest[i]));
-        targetdata[i].x = targetdata[i].x + (dest[i].x - targetdata[i].x) * (cpx / distance);
-        targetdata[i].y = targetdata[i].y + (dest[i].y - targetdata[i].y) * (cpx / distance);
-        return false;
-    }
-}
-
-
 void animate(int val){
 	//codes for any changes in Models, Camera
-
-
-    int i, j, k;
-
-    if (mode == 1)
-    {
-        int rr = rand() % 40;
-        if (rr == 0)
-        {
-            targetdata.pop_back();
-            locs = targetdata;
-            generate_graph();
-            dfs();
-            art_points();
-
-            if (iscon == true && is2con == false)
-            {
-                mode = 0;
-                dest.clear();
-
-
-                for (i = 0; i < targetdata.size(); i++) pp(targetdata[i]);
-                cout << endl;
-
-
-
-                numpoints = locs.size();
-
-                create_bcl();
-                create_tree();
-                create_dtree();
-                super_impose();
-                create_aug_tree();
-                aug_edges();
-                final_edges();
-                //generate_file();
-                int apap = adjust_pos();
-
-                dest = locs;
-
-
-
-                for (i = 0; i < dest.size(); i++) pp(dest[i]);
-                cout << endl << apap << endl;
-
-            }
-
-        }
-
-        else
-        {
-            vector<point> newtarget;
-            newtarget.clear();
-
-            for (i = 0; i < targetdata.size(); i++)
-            {
-                point tp = targetdata[i];
-
-                vector<point> vp;
-                vp.clear();
-
-                vp.push_back(point(tp.x + cpx, tp.y));
-                vp.push_back(point(tp.x - cpx, tp.y));
-                vp.push_back(point(tp.x, tp.y + cpx));
-                vp.push_back(point(tp.x, tp.y - cpx));
-
-                int maxcov = -1;
-                int maxidx = -1;
-
-                for (j = 0; j < vp.size(); j++)
-                {
-                    if (isvalid(vp[j]))
-                    {
-                        int cov = 0;
-
-                        cell nc = getcell(vp[j]);
-                        int celln = nc.x * N + nc.y;
-
-                        for (k = 0; k < AL[celln].size(); k++) cov += lmax - LT[AL[celln][k] / N][AL[celln][k] % N];
-                        if (cov > maxcov)
-                        {
-                            maxcov = cov;
-                            maxidx = j;
-                        }
-                    }
-                }
-                newtarget.push_back(vp[maxidx]);
-            }
-
-
-
-            locs = newtarget;
-            generate_graph();
-            dfs();
-            art_points();
-
-            if (!(iscon == true && is2con == true))
-            {
-                //cout << "here " << TIME << endl;
-                int rr = rand() % 4;
-                if (rr == 0) {for (int i = 0; i < targetdata.size(); i++) if (targetdata[i].x < (N - 1) * cpx) targetdata[i].x += cpx;}
-                else if (rr == 1) {for (int i = 0; i < targetdata.size(); i++) if (targetdata[i].x > cpx) targetdata[i].x -= cpx;}
-                else if (rr == 2) {for (int i = 0; i < targetdata.size(); i++) if (targetdata[i].y < (N - 1) * cpx) targetdata[i].y += cpx;}
-                else {for (int i = 0; i < targetdata.size(); i++) if (targetdata[i].y > cpx) targetdata[i].y -= cpx;}
-
-                locs = targetdata;
-                generate_graph();
-
-
-            }
-            else targetdata = newtarget;
-
-            unordered_set<int> st;
-            st.clear();
-
-            for (i = 0; i < targetdata.size(); i++)
-            {
-                cell nc = getcell(targetdata[i]);
-                int celln = nc.x * N + nc.y;
-                for (int j = 0; j < AL[celln].size(); j++) st.insert(AL[celln][j]);
-            }
-
-
-            for (i = 0; i < N * N; i++)
-            {
-                auto it = st.find(i);
-                if (it != st.end()) LT[i / N][i % N] = lmax;
-                else if (LT[i / N][i % N] > 0) LT[i / N][i % N]--;
-            }
-
-        }
-
-
-
-    }
-
-    else
-    {
-        bool flag = true;
-        for (i = 0; i < targetdata.size(); i++) if (advancedest(i) == false) flag = false;
-        locs = targetdata;
-        generate_graph();
-        if (flag == true) mode = 1;
-
-    }
-
-
-
-    TIME++;
 
     glutPostRedisplay();
 	glutTimerFunc(50, animate, 0);
 }
 
-
-
-//find the cells visible from a given cell
-vector<int> processcell(cell c)
-{
-    point p = c.c;
-    vector<int> ret;
-    ret.clear();
-    vector<obs> vo = rangequery(p);
-    int lgn = max(0, c.x - (int)(crange / cpx));
-    int rgn = min(N - 1, c.x + (int)(crange / cpx));
-    int bgn = max(0, c.y - (int)(crange / cpx));
-    int tgn = min(N - 1, c.y + (int)(crange / cpx));
-
-    int i, j, k;
-    for (i = lgn; i <= rgn; i++)
-    {
-        for (j = bgn; j <= tgn; j++)
-        {
-            p = c.c;
-            point tp = point((i + 0.5) * cpx, (j + 0.5) * cpx);
-            if (B[i][j] == false) continue;
-            if ((p.x - tp.x) * (p.x - tp.x) + (p.y - tp.y) * (p.y - tp.y) > crange * crange) continue;
-
-            p.x = (p.x + tp.x) / 2.0;
-            p.y = (p.y + tp.y) / 2.0;
-
-            bool flag = true;
-            for (k = 0; k < vo.size(); k++)
-            {
-                if (doesint(p, tp, point(vo[k].xl, vo[k].yl), point(vo[k].xl, vo[k].yh)))
-                {
-                    flag = false;
-                    break;
-                }
-                if (doesint(p, tp, point(vo[k].xh, vo[k].yl), point(vo[k].xh, vo[k].yh)))
-                {
-                    flag = false;
-                    break;
-                }
-                if (doesint(p, tp, point(vo[k].xl, vo[k].yl), point(vo[k].xh, vo[k].yl)))
-                {
-                    flag = false;
-                    break;
-                }
-                if (doesint(p, tp, point(vo[k].xl, vo[k].yh), point(vo[k].xh, vo[k].yh)))
-                {
-                    flag = false;
-                    break;
-                }
-            }
-            if (flag == true)
-            {
-                ret.push_back(i * N + j);
-            }
-        }
-    }
-    return ret;
-}
-
-
-void experiment()
-{
-    int cntt[33];
-    double distt[33];
-    for (int i = 0; i < 33; i++) {cntt[i] = 0; distt[i] = 0;}
-
-    for (int l = 0; l < 10; l++)
-    {
-        cout << l << endl;
-        targetdata.clear();
-        iscon = false;
-        is2con = false;
-        while (!(iscon == true && is2con == true))
-        {
-            gentarget();
-            locs = targetdata;
-            generate_graph();
-            dfs();
-            art_points();
-        }
-
-        int i, j, k;
-
-        for (i = 0; i < N; i++) for (j = 0; j < N; j++) LT[i][j] = 0;
-
-        mode = 1;
-
-        while (targetdata.size() > 7)
-        {
-            if (mode == 1)
-            {
-                int rr = rand() % 40;
-                if (rr == 0)
-                {
-
-                    targetdata.pop_back();
-                    locs = targetdata;
-                    generate_graph();
-                    dfs();
-                    art_points();
-
-                    if (iscon == true && is2con == false)
-                    {
-                        mode = 0;
-                        dest.clear();
-
-
-                        //for (i = 0; i < targetdata.size(); i++) pp(targetdata[i]);
-                        //cout << endl;
-
-
-
-                        numpoints = locs.size();
-
-                        create_bcl();
-                        create_tree();
-                        create_dtree();
-                        super_impose();
-                        create_aug_tree();
-                        aug_edges();
-                        final_edges();
-                        //generate_file();
-                        int apap = adjust_pos();
-
-                        int ss = locs.size();
-                        cntt[ss]++;
-                        distt[ss] += apap;
-
-                        dest = locs;
-
-
-
-                        //for (i = 0; i < dest.size(); i++) pp(dest[i]);
-                        //cout << endl << apap << endl;
-
-                    }
-
-                }
-
-                else
-                {
-                    vector<point> newtarget;
-                    newtarget.clear();
-
-                    for (i = 0; i < targetdata.size(); i++)
-                    {
-                        point tp = targetdata[i];
-
-                        vector<point> vp;
-                        vp.clear();
-
-                        vp.push_back(point(tp.x + cpx, tp.y));
-                        vp.push_back(point(tp.x - cpx, tp.y));
-                        vp.push_back(point(tp.x, tp.y + cpx));
-                        vp.push_back(point(tp.x, tp.y - cpx));
-
-                        int maxcov = -1;
-                        int maxidx = -1;
-
-                        for (j = 0; j < vp.size(); j++)
-                        {
-                            if (isvalid(vp[j]))
-                            {
-                                int cov = 0;
-
-                                cell nc = getcell(vp[j]);
-                                int celln = nc.x * N + nc.y;
-
-                                for (k = 0; k < AL[celln].size(); k++) cov += lmax - LT[AL[celln][k] / N][AL[celln][k] % N];
-                                if (cov > maxcov)
-                                {
-                                    maxcov = cov;
-                                    maxidx = j;
-                                }
-                            }
-                        }
-                        newtarget.push_back(vp[maxidx]);
-                    }
-
-
-
-                    locs = newtarget;
-                    generate_graph();
-                    dfs();
-                    art_points();
-
-                    if (!(iscon == true && is2con == true))
-                    {
-                        //cout << "here " << TIME << endl;
-                        int rr = rand() % 4;
-                        if (rr == 0) {for (int i = 0; i < targetdata.size(); i++) if (targetdata[i].x < (N - 1) * cpx) targetdata[i].x += cpx;}
-                        else if (rr == 1) {for (int i = 0; i < targetdata.size(); i++) if (targetdata[i].x > cpx) targetdata[i].x -= cpx;}
-                        else if (rr == 2) {for (int i = 0; i < targetdata.size(); i++) if (targetdata[i].y < (N - 1) * cpx) targetdata[i].y += cpx;}
-                        else {for (int i = 0; i < targetdata.size(); i++) if (targetdata[i].y > cpx) targetdata[i].y -= cpx;}
-
-                        locs = targetdata;
-                        generate_graph();
-
-
-                    }
-                    else targetdata = newtarget;
-
-                    unordered_set<int> st;
-                    st.clear();
-
-                    for (i = 0; i < targetdata.size(); i++)
-                    {
-                        cell nc = getcell(targetdata[i]);
-                        int celln = nc.x * N + nc.y;
-                        for (int j = 0; j < AL[celln].size(); j++) st.insert(AL[celln][j]);
-                    }
-
-
-                    for (i = 0; i < N * N; i++)
-                    {
-                        auto it = st.find(i);
-                        if (it != st.end()) LT[i / N][i % N] = lmax;
-                        else if (LT[i / N][i % N] > 0) LT[i / N][i % N]--;
-                    }
-
-                }
-
-
-
-            }
-
-            else
-            {
-                int rr = rand() % 40;
-                if (rr == 0) cout << "fail" << endl;
-                bool flag = true;
-                for (i = 0; i < targetdata.size(); i++) if (advancedest(i) == false) flag = false;
-                locs = targetdata;
-                generate_graph();
-                if (flag == true) mode = 1;
-
-            }
-
-
-
-        }
-
-    }
-
-    for (int i = 0; i < 33; i++)
-    {
-        cout << cntt[i] << " " << distt[i] / (cntt[i] * cr) << endl;
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-}
-
-
 void init(){
 	//codes for initialization
 
-    TIME = 0;
-    cr = 200.0;
+	input_data();
 
-    int i, j;
+	fout = fopen("out256g.txt","w");
+	fprintf(fout, "%f\n", cr);
 
-	genobs();
-	genblockedcells();
+	srand(time(NULL));
 
-	AL.clear();
-    for (i = 0; i < N; i++) for (j = 0; j < N; j++) AL.push_back(processcell(cell(i, j)));
+	struct timeval tps;
+    struct timeval tpe;
+    long int st;
+    long int et;
+
+    gettimeofday(&tps, NULL);
+    st = tps.tv_sec * 1000000 + tps.tv_usec ;
+    double sum = 0;
+
+    for (int i = 0; i < numtestcases; i++)
+    {
+        locs = vector<point>(allpoints.begin() + i * numpoints, allpoints.begin() + (i + 1) * numpoints);
+
+
+        generate_graph();
+        art_points();
+        create_bcl();
+        create_tree();
+        create_dtree();
+        super_impose();
+        create_aug_tree();
+        aug_edges();
+        final_edges();
+        //generate_file();
+        sum += adjust_pos();
+
+    }
+
+    gettimeofday(&tpe, NULL);
+    et = tpe.tv_sec * 1000000 + tpe.tv_usec ;
+
+    long int oldt = (et - st);
+    cout << "Distance: " << sum / (100 * cr) << endl;
+    cout << "Time: " << oldt / 100 << endl;
+
+    fclose(fout);
 
 
 
-    experiment();
+
 
 
 
@@ -1898,7 +1312,7 @@ void init(){
 	glLoadIdentity();
 
 	//give PERSPECTIVE parameters
-	gluOrtho2D(0, N * cpx, 0, N * cpx);
+	gluOrtho2D(0, 500, 0, 500);
 	//gluPerspective(80,	1,	1,	1000.0);
 	//field of view in the Y (vertically)
 	//aspect ratio that determines the field of view in the X direction (horizontally)
@@ -1908,7 +1322,7 @@ void init(){
 
 int main(int argc, char **argv){
 	glutInit(&argc,argv);
-	glutInitWindowSize(N * cpx, N * cpx);
+	glutInitWindowSize(500, 500);
 	glutInitWindowPosition(0, 0);
 	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGB);	//Depth, Double buffer, RGB color
 
@@ -1931,5 +1345,4 @@ int main(int argc, char **argv){
 
 	return 0;
 }
-
 
