@@ -6,7 +6,10 @@
 using namespace std;
 
 #define INF 1e18
-#define eps 1e-12
+#define eps 1e-6
+
+// #define num_points 16
+// #define com_range 200.0
  
 struct point {
     double x, y;
@@ -142,9 +145,9 @@ bool is2con;
 
 void input_data()
 {
-    fin = fopen("data.txt","r");
-	fscanf(fin, " %d", &num_points);
-	fscanf(fin, " %lf", &com_range);
+    // fin = fopen("data16.txt","r");
+	// fscanf(fin, " %d", &num_points);
+	// fscanf(fin, " %lf", &com_range);
 
     //cout << num_points << " " << com_range << endl;
 
@@ -157,7 +160,7 @@ void input_data()
         locs.push_back(tmp);
     }
 
-    fclose(fin);
+    //fclose(fin);
 }
 
 int closest_to_center_idx(point c, vector<point> p) {
@@ -382,100 +385,122 @@ void print_vec(vector<int> v){
 
 
 int main() {
-    input_data();
-    generate_graph();
-
-    if (is_biconnected()) return 0;
-
-    new_locs = vector<point>(num_points);
-    is_processed = vector<bool>(num_points, false);
-
-    circle mec = welzl(locs);
-    point c = mec.c;
-
-    //cout << c.x << " " << c.y << endl;
-
-    int ci = closest_to_center(c);
-    is_processed[ci] = true;
-    new_locs[ci] = locs[ci];
-
-    pair<int, int> tmp = two_nearest_neibors(ci);
-    //cout << ci << " " << tmp.first << " " << tmp.second << endl;
-
-    double fd = farthest_pair_dist(ci, tmp.first, tmp.second);
-
-    double factor = min(1.0, com_range / fd);
-
-    //cout << factor << endl;
-    is_processed[tmp.first] = true;
-    is_processed[tmp.second] = true;
-
-    // cout << ci << " " << tmp.first << " " << tmp.second << endl;
-
-    new_locs[tmp.first].x = locs[ci].x + (locs[tmp.first].x - locs[ci].x) * factor; 
-    new_locs[tmp.first].y = locs[ci].y + (locs[tmp.first].y - locs[ci].y) * factor; 
-
-    new_locs[tmp.second].x = locs[ci].x + (locs[tmp.second].x - locs[ci].x) * factor; 
-    new_locs[tmp.second].y = locs[ci].y + (locs[tmp.second].y - locs[ci].y) * factor; 
-
-    // cout << new_locs[tmp.first].x << " " << new_locs[tmp.first].y << endl;
-    // cout << new_locs[tmp.second].x << " " << new_locs[tmp.second].y << endl;
-
-    int loop = num_points - 3;
+    fin = fopen("data16.txt","r");
+	fscanf(fin, " %d", &num_points);
+	fscanf(fin, " %lf", &com_range);
 
 
-    while (loop--) {
-        vector<int> in_idx;
-        vector<int> out_idx;
-        for (int i = 0; i < num_points; i++) {
-            if (is_processed[i] == true) in_idx.push_back(i);
-            else out_idx.push_back(i);
-        }
+    int iter = 100;
+    double sum = 0;
+    int wcnt = 0;
+    while (iter--) {
+        input_data();
+        generate_graph();
 
-        // print_vec(in_idx);
-        // print_vec(out_idx);
+        if (is_biconnected()) continue;
 
-        double min_dis = INF;
-        int in_id = -1;
-        int out_id = -1;
-        for (int i = 0; i < in_idx.size(); i++) {
-            for (int j = 0; j < out_idx.size(); j++) {
-                double dis = dist(new_locs[in_idx[i]], locs[out_idx[j]]);
-                if (dis < min_dis) {
-                    min_dis = dis;
-                    in_id = in_idx[i]; 
-                    out_id = out_idx[j];
+        new_locs = vector<point>(num_points);
+        is_processed = vector<bool>(num_points, false);
+
+        circle mec = welzl(locs);
+        point c = mec.c;
+
+        //cout << c.x << " " << c.y << endl;
+
+        int ci = closest_to_center(c);
+        is_processed[ci] = true;
+        new_locs[ci] = locs[ci];
+
+        pair<int, int> tmp = two_nearest_neibors(ci);
+        //cout << ci << " " << tmp.first << " " << tmp.second << endl;
+
+        double fd = farthest_pair_dist(ci, tmp.first, tmp.second);
+
+        double factor = min(1.0, com_range / fd);
+
+        //cout << factor << endl;
+        is_processed[tmp.first] = true;
+        is_processed[tmp.second] = true;
+
+        // cout << ci << " " << tmp.first << " " << tmp.second << endl;
+
+        new_locs[tmp.first].x = locs[ci].x + (locs[tmp.first].x - locs[ci].x) * factor; 
+        new_locs[tmp.first].y = locs[ci].y + (locs[tmp.first].y - locs[ci].y) * factor; 
+
+        new_locs[tmp.second].x = locs[ci].x + (locs[tmp.second].x - locs[ci].x) * factor; 
+        new_locs[tmp.second].y = locs[ci].y + (locs[tmp.second].y - locs[ci].y) * factor; 
+
+        // cout << new_locs[tmp.first].x << " " << new_locs[tmp.first].y << endl;
+        // cout << new_locs[tmp.second].x << " " << new_locs[tmp.second].y << endl;
+
+        int loop = num_points - 3;
+
+
+        while (loop--) {
+            vector<int> in_idx;
+            vector<int> out_idx;
+            for (int i = 0; i < num_points; i++) {
+                if (is_processed[i] == true) in_idx.push_back(i);
+                else out_idx.push_back(i);
+            }
+
+            // print_vec(in_idx);
+            // print_vec(out_idx);
+
+            double min_dis = INF;
+            int in_id = -1;
+            int out_id = -1;
+            for (int i = 0; i < in_idx.size(); i++) {
+                for (int j = 0; j < out_idx.size(); j++) {
+                    double dis = dist(new_locs[in_idx[i]], locs[out_idx[j]]);
+                    if (dis < min_dis) {
+                        min_dis = dis;
+                        in_id = in_idx[i]; 
+                        out_id = out_idx[j];
+                    }
                 }
             }
-        }
-        min_dis = INF;
-        int s_id = -1;
-        for (int i = 0; i < in_idx.size(); i++) {
-            if (in_idx[i] == in_id) continue;
-            double dis = dist(new_locs[in_id], new_locs[in_idx[i]]);
-            if (dis < min_dis) {
-                min_dis = dis;
-                s_id = in_idx[i];
+            min_dis = INF;
+            int s_id = -1;
+            for (int i = 0; i < in_idx.size(); i++) {
+                if (in_idx[i] == in_id) continue;
+                double dis = dist(new_locs[in_id], new_locs[in_idx[i]]);
+                if (dis < min_dis) {
+                    min_dis = dis;
+                    s_id = in_idx[i];
+                }
             }
+            point new_pos = find_pos(locs[out_id], new_locs[in_id], new_locs[s_id]);
+
+            // cout << out_id << endl;
+            // print_point(locs[out_id]);
+            // print_point(new_pos);
+            // cout << endl;
+
+            is_processed[out_id] = true;
+            new_locs[out_id] = new_pos;
+
         }
-        point new_pos = find_pos(locs[out_id], new_locs[in_id], new_locs[s_id]);
 
-        // cout << out_id << endl;
-        // print_point(locs[out_id]);
-        // print_point(new_pos);
-        // cout << endl;
-
-        is_processed[out_id] = true;
-        new_locs[out_id] = new_pos;
+        //for (int i = 0; i < num_points; i++) print_point(new_locs[i]);
+        double max_dis = -INF;
+        for (int i = 0; i < num_points; i++) {
+            max_dis = max(max_dis, dist(locs[i], new_locs[i]));
+        }
+        //cout << max_dis << endl;
+        sum += max_dis;
+        
+        
+        locs = new_locs;
+        generate_graph();
+        if (is_biconnected()) {
+            wcnt++;
+        }
 
     }
-
-    for (int i = 0; i < num_points; i++) print_point(new_locs[i]);
+    cout << wcnt << endl;
+    cout << sum / 20000.0 << endl;
     
-    
-    locs = new_locs;
-    generate_graph();
-    if (is_biconnected()) cout << "it works" << endl;
     
  
     return 0;
