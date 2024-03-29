@@ -15,9 +15,10 @@
 
 using namespace std;
 
-#define eps 1e-8
+#define eps 1e-6
 #define inf 1e12
 #define num_test_cases 100
+#define K 3
 
 double com_range;
 int num_points;
@@ -177,7 +178,7 @@ int dfsvis(int u, bool visited[]) {
 
 // vanilla dfs
 // determines if graph is connected or not
-// sets the iscon flag accordings 
+// sets the iscon flag accordingly
 void dfs()
 {
     bool *visited = new bool[G.size()];
@@ -190,11 +191,58 @@ void dfs()
     else iscon = true;
 }
 
-// test is graph is biconneced
-bool is_biconnected(){
-    dfs();
-    art_points();
-    return iscon and is2con;
+// modified dfs that does not visit nodes in v
+// determines if graph G minus the nodes in v is connected or not
+// sets the iscon flag accordingly
+void dfs_mod(vector<int> v)
+{
+    bool *visited = new bool[G.size()];
+
+    for (int i = 0; i < G.size(); i++) visited[i] = false;
+    for (int i = 0; i < v.size(); i++) visited[v[i]] = true;
+
+    int startnode = 0;
+    while (true) {
+        if (visited[startnode] == true) startnode++;
+        else break;
+    }
+
+    int cnt = dfsvis(startnode, visited);
+
+    if (cnt + K - 1 < (int)G.size()) iscon = false;
+    else iscon = true;
+}
+
+// test is graph is kconneced
+bool is_kconnected(){
+    if (K == 2) {
+        dfs();
+        art_points();
+        return iscon and is2con;
+    }
+    else if (K == 3) {
+        for (int i = 0; i < num_points; i++) {
+            for (int j = i + 1; j < num_points; j++) {
+                vector<int> v = {i, j};
+                dfs_mod(v);
+                if (iscon == false) return false;
+            }
+        }
+        return true;
+    }
+    else if (K == 4) {
+        for (int i = 0; i < num_points; i++) {
+            for (int j = i + 1; j < num_points; j++) {
+                for (int k = j + 1; k < num_points; k++) {
+                    vector<int> v = {i, j, k};
+                    dfs_mod(v);
+                    if (iscon == false) return false;
+                }
+            }
+        }
+        return true;
+    }
+    return true;
 }
 
 // moves node c towards node p such that their distance equals com_range
@@ -303,6 +351,8 @@ int count_edges() {
 void augment_edges() {
     add_edges.clear();
 
+    //cout << count_edges() << endl;
+
     // determine all edges currently not in G and put those in com_edges
     vector<edge> com_edges;
     for (int i = 0; i < num_points; i++) {
@@ -328,9 +378,11 @@ void augment_edges() {
         int v = tmp.v;
         G[u].push_back(v);
         G[v].push_back(u);
-        if (is_biconnected() == true) break;
+        if (is_kconnected() == true) break;
         cnt++; 
     }
+
+    //cout << count_edges() << endl;
 
     add_edges.push_back({com_edges[cnt].u, com_edges[cnt].v});
 
@@ -339,14 +391,24 @@ void augment_edges() {
         edge tmp = com_edges[i];
         int u = tmp.u;
         int v = tmp.v;
-        remove(G[u].begin(), G[u].end(), v);
-        remove(G[v].begin(), G[v].end(), u);
-        if (is_biconnected() == true) continue;
+        
+        vector<int> nu;
+        vector<int> nv;
+        for (int j = 0; j < G[u].size(); j++) if (G[u][j] != v) nu.push_back(G[u][j]);
+        for (int j = 0; j < G[v].size(); j++) if (G[v][j] != u) nv.push_back(G[v][j]);
+        
+        G[u] = nu;
+        G[v] = nv;
+
+        if (is_kconnected() == true) continue;
+
         G[u].push_back(v);
         G[v].push_back(u);
         add_edges.push_back({u, v});
     }
 
+    //cout << count_edges() << endl << endl;
+ 
     return;
 }
 
@@ -394,6 +456,8 @@ int main(){
         pair<double, double> ret = adjust_pos();
         sum_sum += ret.first;
         max_sum += ret.second;
+        // generate_graph();
+        // cout << is_kconnected() << endl;
     }
 
     gettimeofday(&tpe, NULL);

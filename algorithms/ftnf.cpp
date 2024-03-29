@@ -2,14 +2,16 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <sys/time.h>
+#include <time.h>
 
 using namespace std;
 
 #define INF 1e18
 #define eps 1e-6
+#define num_test_cases 100
+#define K 4
 
-// #define num_points 16
-// #define com_range 200.0
  
 struct point {
     double x, y;
@@ -19,6 +21,16 @@ struct circle {
     point c;
     double r;
 };
+
+struct point_dis {
+    int idx;
+    double dis;
+};
+
+bool compare_point_dis(point_dis e1, point_dis e2) {
+    return (e1.dis < e2.dis);
+}
+
  
 double dist(const point& a, const point& b)
 {
@@ -298,7 +310,6 @@ int dfsvis(int u, bool visited[])
 }
 
 
-
 void dfs()
 {
     bool *visited = new bool[G.size()];
@@ -312,11 +323,61 @@ void dfs()
 }
 
 
-bool is_biconnected(){
-    dfs();
-    art_points();
-    return iscon and is2con;
+// modified dfs that does not visit nodes in v
+// determines if graph G minus the nodes in v is connected or not
+// sets the iscon flag accordingly
+void dfs_mod(vector<int> v)
+{
+    bool *visited = new bool[G.size()];
+
+    for (int i = 0; i < G.size(); i++) visited[i] = false;
+    for (int i = 0; i < v.size(); i++) visited[v[i]] = true;
+
+    int startnode = 0;
+    while (true) {
+        if (visited[startnode] == true) startnode++;
+        else break;
+    }
+
+    int cnt = dfsvis(startnode, visited);
+
+    if (cnt + K - 1 < (int)G.size()) iscon = false;
+    else iscon = true;
 }
+
+
+// test is graph is kconneced
+bool is_kconnected(){
+    if (K == 2) {
+        dfs();
+        art_points();
+        return iscon and is2con;
+    }
+    else if (K == 3) {
+        for (int i = 0; i < num_points; i++) {
+            for (int j = i + 1; j < num_points; j++) {
+                vector<int> v = {i, j};
+                dfs_mod(v);
+                if (iscon == false) return false;
+            }
+        }
+        return true;
+    }
+    else if (K == 4) {
+        for (int i = 0; i < num_points; i++) {
+            for (int j = i + 1; j < num_points; j++) {
+                for (int k = j + 1; k < num_points; k++) {
+                    vector<int> v = {i, j, k};
+                    dfs_mod(v);
+                    if (iscon == false) return false;
+                }
+            }
+        }
+        return true;
+    }
+    return true;
+}
+
 
 int closest_to_center(point c) {
     int ret_idx = -1;
@@ -331,44 +392,52 @@ int closest_to_center(point c) {
     return ret_idx;
 }
 
-pair<int, int> two_nearest_neibors(int ci) {
-    int idx1 = -1;
-    int idx2 = -1;
-    double min_dis = INF;
-    double min_dis2 = INF;
+
+vector<int> k_nearest_neibors(int ci) {
+    vector<point_dis> v;
     for (int i = 0; i < locs.size(); i++) {
         if (i == ci) continue;
         double dis = dist(locs[i], locs[ci]);
-        if (dis < min_dis) {
-            min_dis2 = min_dis;
-            min_dis = dis;
-            idx2 = idx1;
-            idx1 = i;
-        }
-        else if (dis < min_dis2) {
-            min_dis2 = dis;
-            idx2 = i;
-        }
+        point_dis tmp;
+        tmp.dis = dis;
+        tmp.idx = i;
+        v.push_back(tmp);
     }
-    return pair<int, int>(idx1, idx2);
+    sort(v.begin(), v.end(), compare_point_dis);
+    vector<int> ret;
+    for (int i = 0; i < K; i++) ret.push_back(v[i].idx);
+    return ret;
 }
 
-double farthest_pair_dist(int i1, int i2, int i3) {
+
+double farthest_pair_dist(int ci, vector<int> v) {
+    v.push_back(ci);
     double d = -INF;
-    d = max(d, dist(locs[i1], locs[i2]));
-    d = max(d, dist(locs[i1], locs[i3]));
-    d = max(d, dist(locs[i3], locs[i2]));
+    for (int i = 0; i < v.size(); i++) {
+        for (int j = i + 1; j < v.size(); j++) {
+            d = max(d, dist(locs[v[i]], locs[v[j]]));
+        }
+    }
     return d;
 }
 
-point find_pos(point a, point b, point c) {
-    double disb = dist(b, a);
-    double disc = dist(c, a);
-    if (disb < disc) b = c;
-    disb = dist(b, a);
+
+point find_pos(int oi, vector<int> inc) {
+    point p = locs[oi];
+    double max_dis = -INF;
+    int id = -1;
+    for (int i = 0; i < inc.size(); i++) {
+        double dis = dist(p, new_locs[inc[i]]);
+        if (dis > max_dis) {
+            id = inc[i];
+            max_dis = dis;
+        }
+    }
+
     point ret;
-    ret.x = b.x + (a.x - b.x) * (com_range / disb);
-    ret.y = b.y + (a.y - b.y) * (com_range / disb);
+    point b = new_locs[id];
+    ret.x = b.x + (p.x - b.x) * (com_range / max_dis);
+    ret.y = b.y + (p.y - b.y) * (com_range / max_dis);
     return ret;
 }
 
@@ -389,15 +458,27 @@ int main() {
 	fscanf(fin, " %d", &num_points);
 	fscanf(fin, " %lf", &com_range);
 
+    srand(time(NULL));
 
-    int iter = 100;
-    double sum = 0;
-    int wcnt = 0;
+	struct timeval tps;
+    struct timeval tpe;
+    long int st;
+    long int et;
+
+    gettimeofday(&tps, NULL);
+    st = tps.tv_sec * 1000000 + tps.tv_usec ;
+
+
+    int iter = num_test_cases;
+
+    double sum_sum = 0;
+    double max_sum = 0;
+
     while (iter--) {
         input_data();
         generate_graph();
 
-        if (is_biconnected()) continue;
+        if (is_kconnected()) continue;
 
         new_locs = vector<point>(num_points);
         is_processed = vector<bool>(num_points, false);
@@ -411,29 +492,23 @@ int main() {
         is_processed[ci] = true;
         new_locs[ci] = locs[ci];
 
-        pair<int, int> tmp = two_nearest_neibors(ci);
+        vector<int> tmp = k_nearest_neibors(ci);
         //cout << ci << " " << tmp.first << " " << tmp.second << endl;
 
-        double fd = farthest_pair_dist(ci, tmp.first, tmp.second);
-
+        double fd = farthest_pair_dist(ci, tmp);
         double factor = min(1.0, com_range / fd);
 
         //cout << factor << endl;
-        is_processed[tmp.first] = true;
-        is_processed[tmp.second] = true;
-
-        // cout << ci << " " << tmp.first << " " << tmp.second << endl;
-
-        new_locs[tmp.first].x = locs[ci].x + (locs[tmp.first].x - locs[ci].x) * factor; 
-        new_locs[tmp.first].y = locs[ci].y + (locs[tmp.first].y - locs[ci].y) * factor; 
-
-        new_locs[tmp.second].x = locs[ci].x + (locs[tmp.second].x - locs[ci].x) * factor; 
-        new_locs[tmp.second].y = locs[ci].y + (locs[tmp.second].y - locs[ci].y) * factor; 
+        for (int i = 0; i < tmp.size(); i++) {
+            is_processed[tmp[i]] = true;
+            new_locs[tmp[i]].x = locs[ci].x + (locs[tmp[i]].x - locs[ci].x) * factor; 
+            new_locs[tmp[i]].y = locs[ci].y + (locs[tmp[i]].y - locs[ci].y) * factor; 
+        }
 
         // cout << new_locs[tmp.first].x << " " << new_locs[tmp.first].y << endl;
         // cout << new_locs[tmp.second].x << " " << new_locs[tmp.second].y << endl;
 
-        int loop = num_points - 3;
+        int loop = num_points - K - 1;
 
 
         while (loop--) {
@@ -460,17 +535,26 @@ int main() {
                     }
                 }
             }
-            min_dis = INF;
-            int s_id = -1;
+
+            vector<point_dis> v;
+
             for (int i = 0; i < in_idx.size(); i++) {
                 if (in_idx[i] == in_id) continue;
                 double dis = dist(new_locs[in_id], new_locs[in_idx[i]]);
-                if (dis < min_dis) {
-                    min_dis = dis;
-                    s_id = in_idx[i];
-                }
+                point_dis tmp;
+                tmp.dis = dis;
+                tmp.idx = in_idx[i];
+                v.push_back(tmp);
             }
-            point new_pos = find_pos(locs[out_id], new_locs[in_id], new_locs[s_id]);
+            
+            sort(v.begin(), v.end(), compare_point_dis);
+
+            vector<int> inc;
+            inc.push_back(in_id);
+            for (int i = 0; i < K -1; i++) inc.push_back(v[i].idx);
+
+
+            point new_pos = find_pos(out_id, inc);
 
             // cout << out_id << endl;
             // print_point(locs[out_id]);
@@ -484,22 +568,38 @@ int main() {
 
         //for (int i = 0; i < num_points; i++) print_point(new_locs[i]);
         double max_dis = -INF;
+        double sum = 0;
         for (int i = 0; i < num_points; i++) {
-            max_dis = max(max_dis, dist(locs[i], new_locs[i]));
+            double distance = dist(locs[i], new_locs[i]);
+            max_dis = max(max_dis, distance);
+            sum += distance;
         }
         //cout << max_dis << endl;
-        sum += max_dis;
+        max_sum += max_dis;
+        sum_sum += sum;
         
         
-        locs = new_locs;
-        generate_graph();
-        if (is_biconnected()) {
-            wcnt++;
-        }
+        // locs = new_locs;
+        // generate_graph();
+        // if (is_kconnected()) cout << "ok" << endl;
+        // else cout << "not ok" << endl;
+
 
     }
-    cout << wcnt << endl;
-    cout << sum / 20000.0 << endl;
+
+    gettimeofday(&tpe, NULL);
+    et = tpe.tv_sec * 1000000 + tpe.tv_usec ;
+
+    long int oldt = (et - st);
+    cout << "Sum of Movements: " << sum_sum / (num_test_cases * com_range) << endl;
+    cout << "Maximum Movement: " << max_sum / (num_test_cases * com_range) << endl;
+    cout << "Time: " << oldt / num_test_cases << endl;
+    
+    
+    // cout << wcnt << endl;
+    // cout << sum / (100 * com_range) << endl;
+
+    fclose(fin);
     
     
  
